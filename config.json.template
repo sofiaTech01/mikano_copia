@@ -1,0 +1,11 @@
+{
+  "FtpHost": "CAMBIAR_POR_SERVIDOR_ORIGEN_IP_O_HOST",
+  "FtpPort": 21,
+  "FtpUser": "CAMBIAR_POR_USUARIO",
+  "FtpPassword": "CAMBIAR_POR_CONTRASEÑA",
+  "Protocol": "ftp",
+  "RemotePath": "/ruta/al/archivo/copia.rar",
+  "LocalDir": "C:\\kopiaz\\traer_mikano\\descargas",
+  "UseWinSCP": true,
+  "WinScpPath": "C:\\Program Files (x86)\\WinSCP\\WinSCP.exe"
+}

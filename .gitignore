@@ -1,0 +1,12 @@
+# Configuración local sensible
+config.json
+
+# Logs de ejecución
+*.log
+download.log
+
+# Archivos de base de datos y backups descargados
+*.rar
+*.sql
+descargas/
+downloads/
