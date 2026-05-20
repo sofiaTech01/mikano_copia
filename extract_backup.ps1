@@ -100,10 +100,12 @@ Write-Log "Compresor detectado: $ArchiverPath"
 $ArchiverExeName = [System.IO.Path]::GetFileName($ArchiverPath).ToLower()
 
 if ($ArchiverExeName -eq "7z.exe") {
-    $Arguments = @("x", "-y", "-o$TargetDir", $ArchiveFile)
+    # "e" extrae sin conservar carpetas internas del archivo
+    $Arguments = @("e", "-y", "-o$TargetDir", $ArchiveFile)
     $Process = Start-Process -FilePath $ArchiverPath -ArgumentList $Arguments -Wait -NoNewWindow -PassThru
 } elseif ($ArchiverExeName -eq "winrar.exe" -or $ArchiverExeName -eq "rar.exe") {
-    $Arguments = @("x", "-y", $ArchiveFile, "$TargetDir\")
+    # "e" extrae sin conservar carpetas internas del archivo
+    $Arguments = @("e", "-y", $ArchiveFile, "$TargetDir\")
     $Process = Start-Process -FilePath $ArchiverPath -ArgumentList $Arguments -Wait -NoNewWindow -PassThru
 } else {
     Write-Log "Error: ArchiverPath no corresponde a 7z.exe, Rar.exe o WinRAR.exe." "ERROR"
