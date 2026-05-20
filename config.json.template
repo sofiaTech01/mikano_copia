@@ -7,6 +7,8 @@
   "RemoteDir": "/ruta/al/directorio/de/backups",
   "FilePrefix": "TOT_PrdCol_",
   "LocalDir": "C:\\kopiaz\\traer_mikano\\descargas",
+  "ExtractDir": "C:\\kopiaz\\traer_mikano\\extraidos",
+  "ArchiverPath": "C:\\kopiaz\\web\\programas_no_borrar\\Rar.exe",
   "UseWinSCP": true,
   "WinScpPath": "C:\\Program Files (x86)\\WinSCP\\WinSCP.exe"
 }
