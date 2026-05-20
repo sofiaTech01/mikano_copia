@@ -1,8 +1,9 @@
 # ==============================================================================
-# Script de Descarga de Backup por FTP
+# Script de Descarga de Backup Dinámico por FTP
 # ==============================================================================
-# Este script se conecta a un servidor FTP/SFTP remoto y descarga un archivo backup
-# (.rar) especificado en config.json. Soporta WinSCP y descarga nativa de PowerShell.
+# Este script se conecta a un servidor FTP/SFTP remoto y descarga la copia de seguridad
+# del día actual basada en un patrón dinámico (ej. TOT_PrdCol_YYYY_MM_DD*.rar).
+# Soporta automatización mediante WinSCP y descarga nativa de PowerShell (.NET).
 # ==============================================================================
 
 # Directorio del script y archivo de configuración
@@ -22,7 +23,7 @@ function Write-Log {
     Add-Content -Path $LogFile -Value $LogLine
 }
 
-Write-Log "Iniciando proceso de descarga de copia de seguridad..."
+Write-Log "Iniciando proceso de descarga de copia de seguridad diaria..."
 
 # Verificar si el archivo de configuración existe
 if (!(Test-Path -Path $ConfigFile)) {
@@ -40,8 +41,8 @@ try {
     exit 1
 }
 
-# Validar campos requeridos
-$RequiredFields = @("FtpHost", "FtpUser", "FtpPassword", "RemotePath", "LocalDir")
+# Validar campos básicos requeridos
+$RequiredFields = @("FtpHost", "FtpUser", "FtpPassword", "LocalDir")
 foreach ($Field in $RequiredFields) {
     if ([string]::IsNullOrEmpty($Config.$Field) -or $Config.$Field -match "^CAMBIAR_POR_") {
         Write-Log "Error: El campo '$Field' en config.json no está configurado correctamente." "ERROR"
@@ -49,16 +50,20 @@ foreach ($Field in $RequiredFields) {
     }
 }
 
-# Asignar variables
-$FtpHost    = $Config.FtpHost
-$FtpPort    = if ([string]::IsNullOrEmpty($Config.FtpPort)) { 21 } else { $Config.FtpPort }
-$FtpUser    = $Config.FtpUser
+# Asignar variables principales
+$FtpHost     = $Config.FtpHost
+$FtpPort     = if ([string]::IsNullOrEmpty($Config.FtpPort)) { 21 } else { $Config.FtpPort }
+$FtpUser     = $Config.FtpUser
 $FtpPassword = $Config.FtpPassword
-$Protocol   = if ([string]::IsNullOrEmpty($Config.Protocol)) { "ftp" } else { $Config.Protocol.ToLower() }
-$RemotePath = $Config.RemotePath
-$LocalDir   = $Config.LocalDir
-$UseWinSCP  = if ($null -eq $Config.UseWinSCP) { $true } else { $Config.UseWinSCP }
-$WinScpPath = $Config.WinScpPath
+$Protocol    = if ([string]::IsNullOrEmpty($Config.Protocol)) { "ftp" } else { $Config.Protocol.ToLower() }
+$LocalDir    = $Config.LocalDir
+$UseWinSCP   = if ($null -eq $Config.UseWinSCP) { $true } else { $Config.UseWinSCP }
+$WinScpPath  = $Config.WinScpPath
+
+# Cargar configuración de rutas
+$RemoteDir   = $Config.RemoteDir
+$FilePrefix  = $Config.FilePrefix
+$RemotePath  = $Config.RemotePath # Mantener compatibilidad estática
 
 # Validar y crear directorio local si no existe
 if (!(Test-Path -Path $LocalDir)) {
@@ -71,18 +76,30 @@ if (!(Test-Path -Path $LocalDir)) {
     }
 }
 
-# Obtener nombre del archivo y ruta de destino local
-$FileName = Split-Path -Leaf -Path $RemotePath
-$LocalPath = Join-Path $LocalDir $FileName
+# Determinar si es descarga dinámica (por fecha) o estática (archivo fijo)
+$IsDynamic = ![string]::IsNullOrEmpty($FilePrefix)
+$SearchPattern = ""
+
+if ($IsDynamic) {
+    # Formatear la fecha actual: AÑO_MES_DIA (ej. 2026_05_20)
+    $DateStr = Get-Date -Format "yyyy_MM_dd"
+    $SearchPattern = "$($FilePrefix)$($DateStr)*.rar"
+    Write-Log "Modo dinámico activo. Buscando copia del día: $SearchPattern"
+} else {
+    if ([string]::IsNullOrEmpty($RemotePath) -or $RemotePath -match "^CAMBIAR_POR_") {
+        Write-Log "Error: Configura 'RemoteDir' y 'FilePrefix' para búsqueda dinámica, o 'RemotePath' para archivo estático." "ERROR"
+        exit 1
+    }
+    Write-Log "Modo estático activo. Archivo fijo a descargar: $RemotePath"
+}
 
 Write-Log "Configuración cargada correctamente."
 Write-Log "Servidor: $($FtpHost):$($FtpPort) ($Protocol)"
-Write-Log "Archivo remoto: $RemotePath"
-Write-Log "Destino local: $LocalPath"
+Write-Log "Directorio local de descarga: $LocalDir"
 
 # Decidir método de descarga
 if ($UseWinSCP) {
-    Write-Log "Usando WinSCP para la descarga..."
+    Write-Log "Método seleccionado: WinSCP"
 
     # Verificar ruta del ejecutable de WinSCP
     if ([string]::IsNullOrEmpty($WinScpPath) -or !(Test-Path -Path $WinScpPath)) {
@@ -129,17 +146,31 @@ if ($UseWinSCP) {
         $ExtraArgs = "-certificate=*"
     }
 
-    # Ejecutar comandos de WinSCP
+    # Asegurar que el directorio local termina en barra para que WinSCP lo reconozca como destino de carpeta
+    $LocalDirTarget = if ($LocalDir.EndsWith("\")) { $LocalDir } else { "$LocalDir\" }
+
+    # Definir ruta de origen remoto (con patrón dinámico o ruta estática)
+    $RemoteSource = ""
+    if ($IsDynamic) {
+        # Combinar RemoteDir y el patrón de búsqueda
+        $RemoteSource = if ($RemoteDir.EndsWith("/")) { "$RemoteDir$SearchPattern" } else { "$RemoteDir/$SearchPattern" }
+    } else {
+        $RemoteSource = $RemotePath
+    }
+
+    # Construir argumentos de WinSCP
+    # Nota: 'option batch abort' hace que WinSCP falle si no encuentra archivos con el comodín
     $WinScpArgs = @(
         "/command",
         "option batch abort",
         "option confirm off",
         "open `"$ConnString`" $ExtraArgs",
-        "get `"$RemotePath`" `"$LocalPath`"",
+        "get `"$RemoteSource`" `"$LocalDirTarget`"",
         "exit"
     )
 
     Write-Log "Ejecutando WinSCP en: $WinScpBin"
+    Write-Log "Comando de descarga: get `"$RemoteSource`" `"$LocalDirTarget`""
     
     # Iniciar WinSCP y capturar código de salida
     $Process = Start-Process -FilePath $WinScpBin -ArgumentList $WinScpArgs -Wait -NoNewWindow -PassThru
@@ -148,39 +179,82 @@ if ($UseWinSCP) {
         Write-Log "Descarga completada exitosamente vía WinSCP." "SUCCESS"
     } else {
         Write-Log "Error al descargar con WinSCP. Código de salida del proceso: $($Process.ExitCode)" "ERROR"
-        Write-Log "Revisa los logs o intenta usar la conexión nativa configurando 'UseWinSCP': false en config.json." "ERROR"
+        Write-Log "Posibles razones: El archivo no existe aún en el FTP, o fallaron las credenciales." "ERROR"
         exit $Process.ExitCode
     }
 
 } else {
     # Descarga nativa (Solo FTP tradicional, no SFTP/FTPS nativo en .NET FtpWebRequest de forma simple sin certificados)
-    Write-Log "Usando descarga FTP nativa de PowerShell..."
+    Write-Log "Método seleccionado: FTP Nativo (.NET FtpWebRequest)"
     
     if ($Protocol -ne "ftp") {
-        Write-Log "Advertencia: El protocolo nativo de .NET FtpWebRequest solo soporta FTP plano. Intentando conexión FTP..." "WARN"
+        Write-Log "Advertencia: El protocolo nativo solo soporta FTP plano. Intentando conexión FTP..." "WARN"
     }
 
+    $RemoteFilePath = ""
+    $LocalPath = ""
+
     try {
-        # Formatear la URL FTP
-        # Quitar barra inicial si RemotePath empieza con ella para no duplicar en la URI
-        $PathClean = $RemotePath.TrimStart("/")
-        $FtpUrl = New-Object System.Uri("ftp://$($FtpHost):$($FtpPort)/$PathClean")
+        if ($IsDynamic) {
+            # Listar directorio FTP para buscar archivos coincidentes
+            $PathClean = if (![string]::IsNullOrEmpty($RemoteDir)) { $RemoteDir.TrimStart("/") } else { "" }
+            $FtpUrl = New-Object System.Uri("ftp://$($FtpHost):$($FtpPort)/$PathClean")
+            
+            $Request = [System.Net.FtpWebRequest]::Create($FtpUrl)
+            $Request.Credentials = New-Object System.Net.NetworkCredential($FtpUser, $FtpPassword)
+            $Request.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectory
+            $Request.KeepAlive = $false
+            
+            Write-Log "Listando directorio remoto para buscar el archivo de hoy: $FtpUrl"
+            $Response = $Request.GetResponse()
+            $Reader = New-Object System.IO.StreamReader($Response.GetResponseStream())
+            $Files = $Reader.ReadToEnd() -split "`r?`n"
+            $Reader.Close()
+            $Response.Close()
+            
+            # Buscar coincidencia
+            $MatchingFiles = $Files | Where-Object { 
+                $name = Split-Path -Leaf $_
+                $name.Trim() -like $SearchPattern
+            }
+            
+            if ($null -eq $MatchingFiles -or $MatchingFiles.Count -eq 0) {
+                Write-Log "Error: No se encontró ningún archivo con el patrón '$SearchPattern' en el servidor remoto." "ERROR"
+                exit 1
+            }
+            
+            # Tomar el primer archivo coincidente
+            $TargetFile = $MatchingFiles[0].Trim()
+            $RemoteFilePath = if ($TargetFile -match "^/") { $TargetFile } else { 
+                if ($RemoteDir.EndsWith("/")) { "$RemoteDir$TargetFile" } else { "$RemoteDir/$TargetFile" }
+            }
+            $LocalPath = Join-Path $LocalDir (Split-Path -Leaf $TargetFile)
+            
+            Write-Log "Archivo diario encontrado en servidor: $TargetFile"
+        } else {
+            $RemoteFilePath = $RemotePath
+            $LocalPath = Join-Path $LocalDir (Split-Path -Leaf $RemotePath)
+        }
+
+        # Proceder a descargar el archivo específico
+        $PathClean = $RemoteFilePath.TrimStart("/")
+        $DownloadUrl = New-Object System.Uri("ftp://$($FtpHost):$($FtpPort)/$PathClean")
         
-        $Request = [System.Net.FtpWebRequest]::Create($FtpUrl)
+        Write-Log "Iniciando descarga de $DownloadUrl hacia $LocalPath..."
+        
+        $Request = [System.Net.FtpWebRequest]::Create($DownloadUrl)
         $Request.Credentials = New-Object System.Net.NetworkCredential($FtpUser, $FtpPassword)
         $Request.Method = [System.Net.WebRequestMethods+Ftp]::DownloadFile
         $Request.UseBinary = $true
         $Request.KeepAlive = $false
         
-        Write-Log "Conectando a $FtpUrl..."
         $Response = $Request.GetResponse()
         $ResponseStream = $Response.GetResponseStream()
         
-        # Guardar en archivo local
+        # Flujo de escritura local
         $LocalStream = [System.IO.File]::Create($LocalPath)
         $Buffer = New-Object Byte[] 10240
         
-        Write-Log "Descargando datos..."
         while (($Read = $ResponseStream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {
             $LocalStream.Write($Buffer, 0, $Read)
         }

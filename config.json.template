@@ -4,7 +4,8 @@
   "FtpUser": "CAMBIAR_POR_USUARIO",
   "FtpPassword": "CAMBIAR_POR_CONTRASEÑA",
   "Protocol": "ftp",
-  "RemotePath": "/ruta/al/archivo/copia.rar",
+  "RemoteDir": "/ruta/al/directorio/de/backups",
+  "FilePrefix": "TOT_PrdCol_",
   "LocalDir": "C:\\kopiaz\\traer_mikano\\descargas",
   "UseWinSCP": true,
   "WinScpPath": "C:\\Program Files (x86)\\WinSCP\\WinSCP.exe"
