@@ -68,12 +68,7 @@ if ($null -eq $Candidates -or $Candidates.Count -eq 0) {
 }
 
 $ArchiveFile = $Candidates[0].FullName
-$ArchiveName = $Candidates[0].BaseName
-$TargetDir = Join-Path $ExtractDir $ArchiveName
-
-if (!(Test-Path -Path $TargetDir)) {
-    New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-}
+$TargetDir = $ExtractDir
 
 Write-Log "Archivo seleccionado: $ArchiveFile"
 Write-Log "Destino de extraccion: $TargetDir"
