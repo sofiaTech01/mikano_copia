@@ -9,6 +9,13 @@
   "LocalDir": "C:\\kopiaz\\traer_mikano\\descargas",
   "ExtractDir": "C:\\kopiaz\\traer_mikano\\extraidos",
   "ArchiverPath": "C:\\kopiaz\\web\\programas_no_borrar\\Rar.exe",
+  "DbHost": "127.0.0.1",
+  "DbPort": 3306,
+  "DbName": "CAMBIAR_POR_NOMBRE_BD_DESTINO",
+  "DbUser": "CAMBIAR_POR_USUARIO_BD",
+  "DbPassword": "CAMBIAR_POR_PASSWORD_BD",
+  "SqlFilePrefix": "TOT_PrdCol_",
+  "MysqlPath": "C:\\xampp\\mysql\\bin\\mysql.exe",
   "UseWinSCP": true,
   "WinScpPath": "C:\\Program Files (x86)\\WinSCP\\WinSCP.exe"
 }
