@@ -97,8 +97,7 @@ if ([string]::IsNullOrEmpty($MysqlPath) -or !(Test-Path -Path $MysqlPath)) {
     exit 1
 }
 
-$TempCmd = Join-Path $ScriptDir "mysql_import_commands.sql"
-$SqlFileForSource = $SqlFile -replace "\\", "/"
+$TempDropTriggers = Join-Path $ScriptDir "mysql_drop_triggers.sql"
 
 try {
     $env:MYSQL_PWD = $DbPassword
@@ -119,37 +118,38 @@ try {
         exit $LASTEXITCODE
     }
 
-    $ImportScriptLines = @(
-        "SET FOREIGN_KEY_CHECKS = 0;"
-    )
+    $DropScriptLines = @("SET FOREIGN_KEY_CHECKS = 0;")
 
     foreach ($Stmt in $DropTriggerStatements) {
         if (![string]::IsNullOrWhiteSpace($Stmt)) {
-            $ImportScriptLines += $Stmt
+            $DropScriptLines += $Stmt
         }
     }
 
-    $ImportScriptLines += @(
-        "SET FOREIGN_KEY_CHECKS = 1;",
-        "source $SqlFileForSource;"
-    )
+    $DropScriptLines += "SET FOREIGN_KEY_CHECKS = 1;"
+    Set-Content -Path $TempDropTriggers -Value $DropScriptLines -Encoding UTF8
 
-    Set-Content -Path $TempCmd -Value $ImportScriptLines -Encoding UTF8
-
-    $Arguments = @(
+    $BaseArguments = @(
         "--host=$DbHost",
         "--port=$DbPort",
         "--user=$DbUser",
         "--database=$DbName",
-        "--default-character-set=utf8mb4",
-        "--execute=source `"$TempCmd`""
+        "--default-character-set=utf8mb4"
     )
 
-    $Process = Start-Process -FilePath $MysqlPath -ArgumentList $Arguments -Wait -NoNewWindow -PassThru
+    # 1) Limpia triggers existentes en la base destino
+    $DropProcess = Start-Process -FilePath $MysqlPath -ArgumentList $BaseArguments -RedirectStandardInput $TempDropTriggers -Wait -NoNewWindow -PassThru
+    if ($DropProcess.ExitCode -ne 0) {
+        Write-Log "Error al eliminar triggers existentes. Codigo de salida: $($DropProcess.ExitCode)" "ERROR"
+        exit $DropProcess.ExitCode
+    }
+
+    # 2) Importa el dump SQL principal
+    $Process = Start-Process -FilePath $MysqlPath -ArgumentList $BaseArguments -RedirectStandardInput $SqlFile -Wait -NoNewWindow -PassThru
     Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
 } finally {
-    if (Test-Path $TempCmd) {
-        Remove-Item $TempCmd -Force
+    if (Test-Path $TempDropTriggers) {
+        Remove-Item $TempDropTriggers -Force
     }
 }
 
