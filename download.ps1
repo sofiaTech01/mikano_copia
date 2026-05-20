@@ -61,7 +61,7 @@ $UseWinSCP   = if ($null -eq $Config.UseWinSCP) { $true } else { $Config.UseWinS
 $WinScpPath  = $Config.WinScpPath
 
 # Cargar configuración de rutas
-$RemoteDir   = $Config.RemoteDir
+$RemoteDir   = if ([string]::IsNullOrEmpty($Config.RemoteDir)) { "./" } else { $Config.RemoteDir }
 $FilePrefix  = $Config.FilePrefix
 $RemotePath  = $Config.RemotePath # Mantener compatibilidad estática
 
@@ -153,34 +153,47 @@ if ($UseWinSCP) {
     $RemoteSource = ""
     if ($IsDynamic) {
         # Combinar RemoteDir y el patrón de búsqueda
-        $RemoteSource = if ($RemoteDir.EndsWith("/")) { "$RemoteDir$SearchPattern" } else { "$RemoteDir/$SearchPattern" }
+        if ([string]::IsNullOrEmpty($RemoteDir)) {
+            $RemoteSource = $SearchPattern
+        } elseif ($RemoteDir.EndsWith("/")) {
+            $RemoteSource = "$RemoteDir$SearchPattern"
+        } else {
+            $RemoteSource = "$RemoteDir/$SearchPattern"
+        }
     } else {
         $RemoteSource = $RemotePath
     }
 
-    # Construir argumentos de WinSCP
-    # Nota: 'option batch abort' hace que WinSCP falle si no encuentra archivos con el comodín
-    $WinScpArgs = @(
-        "/command",
-        "option batch abort",
-        "option confirm off",
-        "open `"$ConnString`" $ExtraArgs",
-        "get `"$RemoteSource`" `"$LocalDirTarget`"",
-        "exit"
-    )
-
-    Write-Log "Ejecutando WinSCP en: $WinScpBin"
-    Write-Log "Comando de descarga: get `"$RemoteSource`" `"$LocalDirTarget`""
-    
-    # Iniciar WinSCP y capturar código de salida
-    $Process = Start-Process -FilePath $WinScpBin -ArgumentList $WinScpArgs -Wait -NoNewWindow -PassThru
-    
-    if ($Process.ExitCode -eq 0) {
-        Write-Log "Descarga completada exitosamente vía WinSCP." "SUCCESS"
-    } else {
-        Write-Log "Error al descargar con WinSCP. Código de salida del proceso: $($Process.ExitCode)" "ERROR"
-        Write-Log "Posibles razones: El archivo no existe aún en el FTP, o fallaron las credenciales." "ERROR"
-        exit $Process.ExitCode
+    # Crear script temporal para WinSCP para evitar problemas de escape en la línea de comandos
+    $ScriptFile = Join-Path $ScriptDir "winscp_commands.txt"
+    try {
+        $ScriptContent = @"
+option batch abort
+option confirm off
+open "$ConnString" $ExtraArgs
+get "$RemoteSource" "$LocalDirTarget"
+exit
+"@
+        Set-Content -Path $ScriptFile -Value $ScriptContent -Force -Encoding UTF8
+        
+        Write-Log "Ejecutando WinSCP en: $WinScpBin"
+        Write-Log "Comando de descarga: get `"$RemoteSource`" `"$LocalDirTarget`""
+        
+        # Iniciar WinSCP con el script temporal
+        $Process = Start-Process -FilePath $WinScpBin -ArgumentList "/script=`"$ScriptFile`"" -Wait -NoNewWindow -PassThru
+        
+        if ($Process.ExitCode -eq 0) {
+            Write-Log "Descarga completada exitosamente vía WinSCP." "SUCCESS"
+        } else {
+            Write-Log "Error al descargar con WinSCP. Código de salida del proceso: $($Process.ExitCode)" "ERROR"
+            Write-Log "Posibles razones: El archivo no existe aún en el FTP, o fallaron las credenciales." "ERROR"
+            exit $Process.ExitCode
+        }
+    } finally {
+        # Asegurar la eliminación del archivo temporal con la contraseña
+        if (Test-Path $ScriptFile) {
+            Remove-Item $ScriptFile -Force | Out-Null
+        }
     }
 
 } else {
