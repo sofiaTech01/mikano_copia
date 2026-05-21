@@ -77,6 +77,12 @@ try {
     if ($hash === false) {
         fail("No se pudo generar hash bcrypt");
     }
+    if (strlen($hash) < 60 || strpos($hash, '$2y$') !== 0) {
+        fail("El hash generado no parece bcrypt valido. Hash: {$hash}");
+    }
+
+    $dbCheck = $pdo->query("SELECT DATABASE() AS dbname")->fetch();
+    echo "[INFO] Base conectada: " . $dbCheck['dbname'] . PHP_EOL;
 
     if ($onlyActive) {
         $sql = "UPDATE tbcomercial SET password = :hash WHERE habilita IN ('A','1')";
@@ -87,8 +93,20 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':hash' => $hash]);
 
+    $verifySql = "SELECT COUNT(*) AS total, MIN(CHAR_LENGTH(password)) AS min_len, MAX(CHAR_LENGTH(password)) AS max_len
+                  FROM tbcomercial
+                  WHERE password = :hash";
+    $verifyStmt = $pdo->prepare($verifySql);
+    $verifyStmt->execute([':hash' => $hash]);
+    $verify = $verifyStmt->fetch();
+
     echo "[OK] Usuarios actualizados: " . $stmt->rowCount() . PHP_EOL;
     echo "[OK] Modo: " . ($onlyActive ? "solo activos" : "todos") . PHP_EOL;
+    echo "[INFO] Filas verificadas con hash exacto: " . (int)$verify['total'] . PHP_EOL;
+    echo "[INFO] Largo min/max guardado: " . (int)$verify['min_len'] . "/" . (int)$verify['max_len'] . PHP_EOL;
+    if ((int)$verify['total'] === 0 || (int)$verify['min_len'] < 50) {
+        fail("La BD no guardo el bcrypt como se esperaba. Revisa si otra rutina o proceso reescribe la columna password.");
+    }
     echo "[OK] Proceso finalizado." . PHP_EOL;
 } catch (Exception $e) {
     fail("Error durante la ejecucion: " . $e->getMessage());
