@@ -15,7 +15,18 @@ $configFile = $scriptDir . DIRECTORY_SEPARATOR . 'config.json';
 
 function fail($message, $code = 1)
 {
-    fwrite(STDERR, "[ERROR] {$message}" . PHP_EOL);
+    $line = "[ERROR] {$message}" . PHP_EOL;
+    if (defined('STDERR') && is_resource(STDERR)) {
+        fwrite(STDERR, $line);
+    } else {
+        $err = @fopen('php://stderr', 'w');
+        if (is_resource($err)) {
+            fwrite($err, $line);
+            fclose($err);
+        } else {
+            echo $line;
+        }
+    }
     exit($code);
 }
 
