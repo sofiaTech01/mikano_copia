@@ -33,11 +33,11 @@ if (!is_array($config)) {
     fail("config.json no es JSON valido");
 }
 
-$dbHost = $config['DbHost'] ?? '';
-$dbPort = $config['DbPort'] ?? 3306;
-$dbName = $config['DbName'] ?? '';
-$dbUser = $config['DbUser'] ?? '';
-$dbPass = $config['DbPassword'] ?? '';
+$dbHost = isset($config['DbHost']) ? $config['DbHost'] : '';
+$dbPort = isset($config['DbPort']) ? $config['DbPort'] : 3306;
+$dbName = isset($config['DbName']) ? $config['DbName'] : '';
+$dbUser = isset($config['DbUser']) ? $config['DbUser'] : '';
+$dbPass = isset($config['DbPassword']) ? $config['DbPassword'] : '';
 
 if ($dbHost === '' || $dbName === '' || $dbUser === '' || $dbPass === '') {
     fail("Faltan campos de BD en config.json (DbHost, DbName, DbUser, DbPassword)");
