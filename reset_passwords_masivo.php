@@ -39,9 +39,17 @@ if ($configRaw === false) {
     fail("No se pudo leer config.json");
 }
 
+// Quita BOM UTF-8 si existe
+if (substr($configRaw, 0, 3) === "\xEF\xBB\xBF") {
+    $configRaw = substr($configRaw, 3);
+}
+
 $config = json_decode($configRaw, true);
 if (!is_array($config)) {
-    fail("config.json no es JSON valido");
+    if (function_exists('json_last_error_msg')) {
+        fail("config.json no es JSON valido: " . json_last_error_msg());
+    }
+    fail("config.json no es JSON valido. Codigo: " . json_last_error());
 }
 
 $dbHost = isset($config['DbHost']) ? $config['DbHost'] : '';
