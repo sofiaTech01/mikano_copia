@@ -14,6 +14,7 @@
   "DbName": "CAMBIAR_POR_NOMBRE_BD_DESTINO",
   "DbUser": "CAMBIAR_POR_USUARIO_BD",
   "DbPassword": "CAMBIAR_POR_PASSWORD_BD",
+  "ResetPassword": "12233",
   "SqlFilePrefix": "TOT_PrdCol_",
   "MysqlPath": "C:\\xampp\\mysql\\bin\\mysql.exe",
   "UseWinSCP": true,

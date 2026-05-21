@@ -2,13 +2,11 @@
 // reset_passwords_masivo.php
 // Resetea passwords en tbcomercial usando la conexion del config.json.
 // Uso:
-//   php reset_passwords_masivo.php --password=12233
+//   php reset_passwords_masivo.php
 // Opcional:
 //   --all              => actualiza todos los usuarios (sin filtro habilita)
 //   --only-active      => actualiza solo habilita IN ('A','1') [default]
-// Tambien puedes pasar la clave por variable de entorno:
-//   set NUEVA_CLAVE=12233
-//   php reset_passwords_masivo.php
+// La clave temporal se toma desde config.json (ResetPassword).
 
 $scriptDir = __DIR__;
 $configFile = $scriptDir . DIRECTORY_SEPARATOR . 'config.json';
@@ -81,21 +79,20 @@ $dbPort = isset($config['DbPort']) ? $config['DbPort'] : 3306;
 $dbName = isset($config['DbName']) ? $config['DbName'] : '';
 $dbUser = isset($config['DbUser']) ? $config['DbUser'] : '';
 $dbPass = isset($config['DbPassword']) ? $config['DbPassword'] : '';
+$resetPassword = isset($config['ResetPassword']) ? $config['ResetPassword'] : '';
 
 if ($dbHost === '' || $dbName === '' || $dbUser === '' || $dbPass === '') {
     fail("Faltan campos de BD en config.json (DbHost, DbName, DbUser, DbPassword)");
 }
+if ($resetPassword === '') {
+    fail("Falta campo ResetPassword en config.json");
+}
 
 write_log("Config de BD leida. Host={$dbHost}, Port={$dbPort}, DB={$dbName}, User={$dbUser}");
 
-$passwordArg = null;
 $onlyActive = true;
 
 foreach (array_slice($argv, 1) as $arg) {
-    if (strpos($arg, '--password=') === 0) {
-        $passwordArg = substr($arg, strlen('--password='));
-        continue;
-    }
     if ($arg === '--all') {
         $onlyActive = false;
         continue;
@@ -105,11 +102,7 @@ foreach (array_slice($argv, 1) as $arg) {
         continue;
     }
 }
-
-$newPassword = $passwordArg !== null && $passwordArg !== '' ? $passwordArg : (getenv('NUEVA_CLAVE') ?: '');
-if ($newPassword === '') {
-    fail("Debes indicar la nueva clave con --password=TU_CLAVE o variable de entorno NUEVA_CLAVE");
-}
+$newPassword = $resetPassword;
 
 write_log("Modo de actualizacion: " . ($onlyActive ? "solo activos" : "todos"));
 
