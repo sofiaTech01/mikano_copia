@@ -10,12 +10,10 @@
 //   set NUEVA_CLAVE=12233
 //   php reset_passwords_masivo.php
 
-declare(strict_types=1);
-
 $scriptDir = __DIR__;
 $configFile = $scriptDir . DIRECTORY_SEPARATOR . 'config.json';
 
-function fail(string $message, int $code = 1): void
+function fail($message, $code = 1)
 {
     fwrite(STDERR, "[ERROR] {$message}" . PHP_EOL);
     exit($code);
@@ -49,7 +47,7 @@ $passwordArg = null;
 $onlyActive = true;
 
 foreach (array_slice($argv, 1) as $arg) {
-    if (str_starts_with($arg, '--password=')) {
+    if (strpos($arg, '--password=') === 0) {
         $passwordArg = substr($arg, strlen('--password='));
         continue;
     }
@@ -92,7 +90,6 @@ try {
     echo "[OK] Usuarios actualizados: " . $stmt->rowCount() . PHP_EOL;
     echo "[OK] Modo: " . ($onlyActive ? "solo activos" : "todos") . PHP_EOL;
     echo "[OK] Proceso finalizado." . PHP_EOL;
-} catch (Throwable $e) {
+} catch (Exception $e) {
     fail("Error durante la ejecucion: " . $e->getMessage());
 }
-
